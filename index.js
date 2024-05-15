@@ -1,26 +1,9 @@
 const express = require('express') //引用框架
+const cors = require('cors') //引用跨域模块
 const app = express() //创建服务
 const port = 8088 //项目启动端口
 
-//设置跨域访问
-app.all('*', function (req, res, next) {
-  //设置允许跨域的域名，*代表允许任意域名跨域
-  res.header('Access-Control-Allow-Origin', '*')
-  //允许的header类型
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Requested-With'
-  )
-  //跨域允许的请求方式
-  res.header('Access-Control-Allow-Methods', 'PUT,POST,GET,DELETE,OPTIONS')
-  // 可以带cookies
-  res.header('Access-Control-Allow-Credentials', true)
-  if (req.method == 'OPTIONS') {
-    res.sendStatus(200)
-  } else {
-    next()
-  }
-})
+app.use(cors()) //使用跨域模块
 
 app.get('/sse', (req, res) => {
   res.set({
