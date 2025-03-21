@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE 实时数据演示</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        #messageList {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #messageList li {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.3s;
+        }
+
+        #messageList li:last-child {
+            border-bottom: none;
+        }
+
+        #messageList li:hover {
+            background-color: #f8f9fa;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message-time {
+            color: #6c757d;
+            font-size: 0.85em;
+            margin-left: 8px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>SSE 实时数据演示</h1>
+    <div class="status" id="status"></div>
+    <div class="controls">
+        <button id="connectBtn">连接服务器</button>
+        <button id="disconnectBtn">断开连接</button>
+        <button id="clearBtn">清除消息</button>
+    </div>
+    <ul id="messageList"></ul>
+
+    <script>
+        const MAX_MESSAGES = 100;
+        let eventSource = null;
+        let reconnectTimeout = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+
+        const messageList = document.getElementById('messageList');
+        const status = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        function updateStatus(connected, message = '') {
+            const statusText = connected ? '已连接' : '未连接';
+            status.textContent = message || statusText;
+            status.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            connectBtn.disabled = connected;
+            disconnectBtn.disabled = !connected;
+        }
+
+        function addMessage(data) {
+            const li = document.createElement('li');
+            const time = new Date().toLocaleTimeString();
+            li.innerHTML = `${data.message}<span class="message-time">${time}</span>`;
+            messageList.appendChild(li);
+
+            while (messageList.children.length > MAX_MESSAGES) {
+                messageList.removeChild(messageList.firstChild);
+            }
+
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        function connect() {
+            if (!window.EventSource) {
+                alert('您的浏览器不支持 SSE');
+                return;
+            }
+
+            eventSource = new EventSource('http://localhost:8088/sse');
+
+            eventSource.onopen = () => {
+                updateStatus(true);
+                console.log('连接已建立');
+                reconnectAttempts = 0;
+            };
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addMessage(data);
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('SSE 错误:', error);
+                eventSource.close();
+                updateStatus(false, '连接已断开');
+
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+                    reconnectTimeout = setTimeout(() => {
+                        reconnectAttempts++;
+                        updateStatus(false, `正在尝试重新连接 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                        connect();
+                    }, timeout);
+                } else {
+                    updateStatus(false, '重连失败，请手动重新连接');
+                }
+            };
+        }
+
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                clearTimeout(reconnectTimeout);
+                reconnectAttempts = 0;
+                updateStatus(false);
+            }
+        }
+
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearBtn.addEventListener('click', () => {
+            messageList.innerHTML = '';
+        });
+
+        // 初始状态
+        updateStatus(false);
+
+        // 页面关闭时清理连接
+        window.addEventListener('beforeunload', disconnect);
+    </script>
+</body>
+</html>
