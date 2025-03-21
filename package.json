@@ -1,6 +1,27 @@
 {
+  "name": "sse-demo",
+  "version": "1.0.0",
+  "description": "Server-Sent Events (SSE) demonstration",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js"
+  },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.18.3"
-  }
+    "express": "^4.18.3",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "keywords": [
+    "sse",
+    "server-sent-events",
+    "real-time",
+    "nodejs",
+    "express"
+  ],
+  "author": "PurestFaith",
+  "license": "MIT"
 }
